@@ -1,77 +1,132 @@
 'use client'
 
-import type { SessionJ } from '@/lib/types'
+import { useMemo, useState } from 'react'
+import type { SessionJ, TypeSessionJ } from '@/lib/types'
+import { COULEURS_J } from '@/lib/constants'
+import { Select } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
 
-const SESSION_COLORS: Record<string, string> = {
-  J0:  'bg-red-100 text-red-700 border-red-200',
-  J1:  'bg-orange-100 text-orange-700 border-orange-200',
-  J7:  'bg-amber-100 text-amber-700 border-amber-200',
-  J14: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  J30: 'bg-green-100 text-green-700 border-green-200',
-  J60: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-}
+const TYPES_J: TypeSessionJ[] = ['J0', 'J1', 'J7', 'J14', 'J30', 'J60']
 
-interface Props { sessions: SessionJ[] }
+export default function SessionsJ({ sessions }: { sessions: SessionJ[] }) {
+  const [matiere, setMatiere] = useState('')
+  const [semaine, setSemaine] = useState('')
 
-export function SessionsJ({ sessions }: Props) {
-  if (sessions.length === 0) {
-    return <p className="text-gray-400 text-sm text-center py-8">Aucune session de révision programmée.</p>
-  }
+  const matieres = useMemo(
+    () => Array.from(new Set(sessions.map((s) => s.matiere))).sort(),
+    [sessions]
+  )
 
-  const sorted = [...sessions].sort((a, b) => a.date_session.localeCompare(b.date_session))
-  const grouped: Record<string, SessionJ[]> = {}
-  for (const s of sorted) {
-    if (!grouped[s.type_j]) grouped[s.type_j] = []
-    grouped[s.type_j].push(s)
-  }
+  const semaines = useMemo(() => {
+    const set = new Set<string>()
+    for (const s of sessions) {
+      const d = new Date(s.date_session + 'T00:00:00')
+      const lundi = new Date(d)
+      lundi.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+      set.add(lundi.toISOString().slice(0, 10))
+    }
+    return Array.from(set).sort()
+  }, [sessions])
+
+  const filtered = useMemo(() => {
+    return sessions
+      .filter((s) => !matiere || s.matiere === matiere)
+      .filter((s) => {
+        if (!semaine) return true
+        const d = new Date(s.date_session + 'T00:00:00')
+        const lundi = new Date(d)
+        lundi.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+        return lundi.toISOString().slice(0, 10) === semaine
+      })
+      .sort((a, b) => a.date_session.localeCompare(b.date_session))
+  }, [sessions, matiere, semaine])
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 mb-2">
-        {['J0', 'J1', 'J7', 'J14', 'J30', 'J60'].map(t => (
-          grouped[t] ? (
-            <span key={t} className={`text-xs font-bold px-3 py-1 rounded-full border ${SESSION_COLORS[t]}`}>
-              {t} — {grouped[t].length} session{grouped[t].length > 1 ? 's' : ''}
-            </span>
-          ) : null
-        ))}
+    <div>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-1.5">
+          {TYPES_J.map((t) => (
+            <Badge key={t} style={{ backgroundColor: COULEURS_J[t] }} className="text-gray-700">
+              {t}
+            </Badge>
+          ))}
+        </div>
+        <div className="ml-auto flex gap-2">
+          <Select
+            aria-label="Filtrer par matière"
+            className="h-9 w-auto"
+            value={matiere}
+            onChange={(e) => setMatiere(e.target.value)}
+          >
+            <option value="">Toutes matières</option>
+            {matieres.map((m) => (
+              <option key={m}>{m}</option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Filtrer par semaine"
+            className="h-9 w-auto"
+            value={semaine}
+            onChange={(e) => setSemaine(e.target.value)}
+          >
+            <option value="">Toutes semaines</option>
+            {semaines.map((s) => (
+              <option key={s} value={s}>
+                Sem. du {new Date(s + 'T00:00:00').toLocaleDateString('fr-FR')}
+              </option>
+            ))}
+          </Select>
+        </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 text-gray-500 text-xs">
-              <th className="text-left px-3 py-2 rounded-tl-lg">Type</th>
-              <th className="text-left px-3 py-2">Date</th>
-              <th className="text-left px-3 py-2">Matière</th>
-              <th className="text-left px-3 py-2">Durée</th>
-              <th className="text-left px-3 py-2 rounded-tr-lg">Techniques VAK</th>
+          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+            <tr>
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Matière</th>
+              <th className="px-4 py-3">Durée</th>
+              <th className="px-4 py-3">Techniques</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
-            {sorted.map(s => (
-              <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-3 py-2">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${SESSION_COLORS[s.type_j]}`}>
+          <tbody className="divide-y divide-gray-100">
+            {filtered.map((s) => (
+              <tr key={s.id}>
+                <td className="whitespace-nowrap px-4 py-2.5 text-gray-700">
+                  {new Date(s.date_session + 'T00:00:00').toLocaleDateString('fr-FR', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                  })}
+                </td>
+                <td className="px-4 py-2.5">
+                  <Badge style={{ backgroundColor: COULEURS_J[s.type_j] }} className="text-gray-700">
                     {s.type_j}
-                  </span>
+                  </Badge>
                 </td>
-                <td className="px-3 py-2 text-gray-600">
-                  {new Date(s.date_session).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                <td className="px-4 py-2.5 font-medium text-gray-900">{s.matiere}</td>
+                <td className="whitespace-nowrap px-4 py-2.5 text-gray-600">
+                  {s.duree_min ? `${s.duree_min} min` : '—'}
                 </td>
-                <td className="px-3 py-2 font-medium text-gray-800">{s.matiere}</td>
-                <td className="px-3 py-2 text-gray-500">{s.duree_min ? `${s.duree_min} min` : '—'}</td>
-                <td className="px-3 py-2">
-                  {Array.isArray(s.techniques_vak) && s.techniques_vak.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {(s.techniques_vak as string[]).map((t, i) => (
-                        <span key={i} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{t}</span>
-                      ))}
-                    </div>
-                  ) : <span className="text-gray-300">—</span>}
+                <td className="px-4 py-2.5">
+                  <div className="flex flex-wrap gap-1">
+                    {(Array.isArray(s.techniques_vak) ? s.techniques_vak : []).map((t, i) => (
+                      <span key={i} className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+                        {String(t)}
+                      </span>
+                    ))}
+                  </div>
                 </td>
               </tr>
             ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                  Aucune session ne correspond à ces filtres.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

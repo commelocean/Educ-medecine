@@ -1,32 +1,55 @@
 'use client'
 
 import {
-  RadarChart, PolarGrid, PolarAngleAxis, Radar,
-  ResponsiveContainer, Tooltip
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ResponsiveContainer,
+  Legend,
 } from 'recharts'
-import { GROUPE_META } from '@/lib/questions'
+import { MOYENNE_NATIONALE_IDENTITE } from '@/lib/constants'
 
-interface Props { scores: Record<string, number> }
+const AXES = [
+  'Perfectionniste',
+  'Aimable',
+  'Dynamique',
+  'Rebelle',
+  'Intellectuel',
+  'Enthousiaste',
+  'Émotionnel',
+]
 
-export function RadarIdentite({ scores }: Props) {
-  const data = Object.entries(scores).map(([subject, score]) => ({ subject, score, fullMark: 100 }))
+export default function RadarIdentite({ scores }: { scores: Record<string, number> }) {
+  const data = AXES.map((axe) => ({
+    axe,
+    eleve: scores[axe] ?? 0,
+    national: MOYENNE_NATIONALE_IDENTITE[axe] ?? 0,
+  }))
+
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <RadarChart data={data} margin={{ top: 10, right: 30, left: 30, bottom: 10 }}>
-        <PolarGrid gridType="polygon" />
-        <PolarAngleAxis
-          dataKey="subject"
-          tick={({ x, y, payload }: { x: number; y: number; payload: { value: string } }) => {
-            const meta = GROUPE_META[payload.value]
-            return (
-              <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={11} fill="#4B5563">
-                {meta?.emoji} {payload.value}
-              </text>
-            )
-          }}
+    <ResponsiveContainer width="100%" height={340}>
+      <RadarChart data={data} outerRadius="70%">
+        <PolarGrid stroke="#E5E7EB" />
+        <PolarAngleAxis dataKey="axe" tick={{ fontSize: 11, fill: '#374151' }} />
+        <PolarRadiusAxis angle={90} domain={[0, 'auto']} tick={{ fontSize: 10, fill: '#9CA3AF' }} />
+        <Radar
+          name="Votre profil"
+          dataKey="eleve"
+          stroke="#6366F1"
+          fill="#6366F1"
+          fillOpacity={0.35}
         />
-        <Radar name="Score" dataKey="score" stroke="#6366F1" fill="#6366F1" fillOpacity={0.25} strokeWidth={2} />
-        <Tooltip formatter={(v: number) => [`${v}%`, 'Score']} />
+        <Radar
+          name="Moyenne nationale"
+          dataKey="national"
+          stroke="#9CA3AF"
+          fill="#9CA3AF"
+          fillOpacity={0.15}
+          strokeDasharray="4 4"
+        />
+        <Legend wrapperStyle={{ fontSize: 12 }} />
       </RadarChart>
     </ResponsiveContainer>
   )

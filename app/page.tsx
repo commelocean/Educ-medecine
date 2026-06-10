@@ -26,11 +26,11 @@ export default function HomePage() {
             48 questions · 15-20 minutes · Un planning personnalisé adapté à votre profil de personnalité et à votre style d'apprentissage
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/formulaire" className="bg-white text-indigo-700 font-bold px-8 py-4 rounded-xl hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl">
+            <Link href="/auth" className="bg-white text-indigo-700 font-bold px-8 py-4 rounded-xl hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl">
               Commencer le diagnostic →
             </Link>
-            <Link href="/dashboard" className="border-2 border-white/50 text-white font-semibold px-8 py-4 rounded-xl hover:bg-white/10 transition-colors">
-              Voir les profils existants
+            <Link href="/auth" className="border-2 border-white/50 text-white font-semibold px-8 py-4 rounded-xl hover:bg-white/10 transition-colors">
+              Me connecter
             </Link>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function HomePage() {
       <section className="py-16 px-4 bg-indigo-600 text-white text-center">
         <h2 className="text-3xl font-bold mb-4">Prêt à découvrir votre profil ?</h2>
         <p className="text-indigo-200 mb-8">Soyez spontané, il n\'y a pas de bonne ou mauvaise réponse.</p>
-        <Link href="/formulaire" className="bg-white text-indigo-700 font-bold px-10 py-4 rounded-xl hover:bg-indigo-50 transition-colors shadow-lg">
+        <Link href="/auth" className="bg-white text-indigo-700 font-bold px-10 py-4 rounded-xl hover:bg-indigo-50 transition-colors shadow-lg">
           Démarrer maintenant →
         </Link>
       </section>
