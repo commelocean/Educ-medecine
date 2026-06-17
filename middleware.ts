@@ -1,15 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/config'
 
 const PROTECTED_PREFIXES = ['/onboarding', '/diagnostic', '/eleve', '/admin', '/compte']
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  try {
+    const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -22,31 +21,37 @@ export async function middleware(request: NextRequest) {
           )
         },
       },
+    })
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    const path = request.nextUrl.pathname
+    const isProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p))
+
+    if (isProtected && !user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth'
+      url.searchParams.set('next', path)
+      return NextResponse.redirect(url)
     }
-  )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    if (path === '/auth' && user) {
+      const url = request.nextUrl.clone()
+      url.pathname = request.nextUrl.searchParams.get('next') || '/onboarding'
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
 
-  const path = request.nextUrl.pathname
-  const isProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p))
-
-  if (isProtected && !user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth'
-    url.searchParams.set('next', path)
-    return NextResponse.redirect(url)
+    return response
+  } catch (err) {
+    // Jamais de 500 sur une page à cause de l'auth : en cas d'erreur
+    // (Supabase indisponible, config absente…), on laisse passer la requête.
+    // Les pages protégées restent gardées côté client / RLS.
+    console.error('middleware: échec non bloquant', err)
+    return response
   }
-
-  if (path === '/auth' && user) {
-    const url = request.nextUrl.clone()
-    url.pathname = request.nextUrl.searchParams.get('next') || '/onboarding'
-    url.search = ''
-    return NextResponse.redirect(url)
-  }
-
-  return response
 }
 
 export const config = {

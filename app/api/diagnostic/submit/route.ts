@@ -16,10 +16,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
   }
 
-  const webhookUrl = process.env.N8N_WEBHOOK_URL
-  if (!webhookUrl) {
-    return NextResponse.json({ error: 'N8N_WEBHOOK_URL non configurée.' }, { status: 500 })
-  }
+  // Valeur par défaut pour fonctionner sans configuration d'environnement ;
+  // une variable N8N_WEBHOOK_URL (Vercel / .env) reste prioritaire.
+  const webhookUrl =
+    process.env.N8N_WEBHOOK_URL ??
+    'https://n8n-formation.isao.io/webhook/88f8f497-48ed-4925-904a-8fa0d9ab3250'
 
   let body: {
     reponses: Record<string, 'OUI' | 'NON'>
