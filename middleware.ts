@@ -1,57 +1,42 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/config'
 
 const PROTECTED_PREFIXES = ['/onboarding', '/diagnostic', '/eleve', '/admin', '/compte']
 
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request })
+// Détection légère de session : présence d'un cookie d'auth Supabase
+// (sb-<ref>-auth-token, éventuellement découpé en .0/.1…). On NE valide PAS
+// le jeton ici — la vraie protection est côté serveur (RLS) et chaque page
+// re-vérifie l'authentification. Objectif : simple redirection UX.
+//
+// Volontairement SANS dépendance (pas de SDK Supabase) : le middleware tourne
+// sur le runtime Edge de Vercel, où l'initialisation du client Supabase peut
+// échouer (MIDDLEWARE_INVOCATION_FAILED). Ici, aucune dépendance ni appel
+// réseau ⇒ impossible de planter.
+function hasAuthCookie(request: NextRequest): boolean {
+  return request.cookies
+    .getAll()
+    .some((c) => c.name.startsWith('sb-') && c.name.includes('auth-token'))
+}
 
-  try {
-    const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
-    })
+export function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname
+  const authed = hasAuthCookie(request)
+  const isProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p))
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    const path = request.nextUrl.pathname
-    const isProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p))
-
-    if (isProtected && !user) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/auth'
-      url.searchParams.set('next', path)
-      return NextResponse.redirect(url)
-    }
-
-    if (path === '/auth' && user) {
-      const url = request.nextUrl.clone()
-      url.pathname = request.nextUrl.searchParams.get('next') || '/onboarding'
-      url.search = ''
-      return NextResponse.redirect(url)
-    }
-
-    return response
-  } catch (err) {
-    // Jamais de 500 sur une page à cause de l'auth : en cas d'erreur
-    // (Supabase indisponible, config absente…), on laisse passer la requête.
-    // Les pages protégées restent gardées côté client / RLS.
-    console.error('middleware: échec non bloquant', err)
-    return response
+  if (isProtected && !authed) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth'
+    url.searchParams.set('next', path)
+    return NextResponse.redirect(url)
   }
+
+  if (path === '/auth' && authed) {
+    const url = request.nextUrl.clone()
+    url.pathname = request.nextUrl.searchParams.get('next') || '/onboarding'
+    url.search = ''
+    return NextResponse.redirect(url)
+  }
+
+  return NextResponse.next()
 }
 
 export const config = {
