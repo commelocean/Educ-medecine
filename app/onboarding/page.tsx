@@ -13,17 +13,23 @@ const ETAPES = [
 export default function OnboardingPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
-      <h1 className="text-3xl font-bold text-gray-900">Avant de commencer</h1>
-      <p className="mt-2 text-gray-600">
+      <h1 className="animate-fade-up text-3xl font-bold tracking-tight text-gray-900">
+        Avant de commencer
+      </h1>
+      <p className="mt-2 animate-fade-up text-gray-600 anim-delay-75">
         Le diagnostic dure <strong>{DUREE_ESTIMEE.toLowerCase()}</strong>. Vos réponses sont
         sauvegardées automatiquement : vous pouvez quitter et reprendre à tout moment.
       </p>
 
       <div className="mt-8 space-y-4">
         {ETAPES.map((e, i) => (
-          <Card key={e.titre}>
+          <Card
+            key={e.titre}
+            className="animate-fade-up hover:shadow-soft"
+            style={{ animationDelay: `${100 + i * 75}ms` }}
+          >
             <CardContent className="flex items-start gap-4 p-5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 font-semibold text-indigo-700">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-gradient font-semibold text-white shadow-soft">
                 {i + 1}
               </span>
               <div>

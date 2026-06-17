@@ -33,10 +33,10 @@ export default function DashboardElevePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">
+      <h1 className="animate-fade-up text-2xl font-bold tracking-tight text-gray-900">
         Bonjour {q.eleves?.prenom} 👋
       </h1>
-      <p className="mt-1 text-sm text-gray-600">
+      <p className="mt-1 animate-fade-up text-sm text-gray-600 anim-delay-75">
         Voici votre espace personnalisé Médecine Top 7 %.
       </p>
 
@@ -48,7 +48,7 @@ export default function DashboardElevePage() {
       )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Card className={cn(metaDominante?.bg)}>
+        <Card className={cn('animate-fade-up transition-all hover:shadow-soft-lg anim-delay-100', metaDominante?.bg)}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Profil dominant</CardTitle>
           </CardHeader>
@@ -61,7 +61,7 @@ export default function DashboardElevePage() {
             )}
           </CardContent>
         </Card>
-        <Card className={cn(metaCanal?.bg)}>
+        <Card className={cn('animate-fade-up transition-all hover:shadow-soft-lg anim-delay-150', metaCanal?.bg)}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">
               Canal d&apos;apprentissage

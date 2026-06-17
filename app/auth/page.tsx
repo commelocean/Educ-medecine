@@ -82,8 +82,8 @@ function AuthForm() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[80vh] max-w-md items-center px-4">
-      <Card className="w-full">
+    <div className="mx-auto flex min-h-[80vh] max-w-md items-center px-4 py-10">
+      <Card className="w-full animate-scale-in shadow-soft-lg">
         <CardHeader>
           <CardTitle>{mode === 'login' ? 'Connexion' : 'Créer un compte'}</CardTitle>
           <CardDescription>
