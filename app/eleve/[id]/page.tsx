@@ -24,12 +24,7 @@ export default function DashboardElevePage() {
     .slice(0, 5)
 
   const metaDominante = q.identite_dominante ? GROUPE_META[q.identite_dominante] : null
-  const metaCanal =
-    q.canal_dominant === 'Kinesthesique'
-      ? GROUPE_META['Kinesthésique']
-      : q.canal_dominant
-        ? GROUPE_META[q.canal_dominant]
-        : null
+  const metaCanal = q.canal_dominant ? GROUPE_META[q.canal_dominant] : null
 
   return (
     <div>
@@ -71,6 +66,7 @@ export default function DashboardElevePage() {
             <p className={cn('text-2xl font-bold', metaCanal?.text ?? 'text-gray-400')}>
               {metaCanal?.emoji}{' '}
               {q.canal_dominant === 'Kinesthesique' ? 'Kinesthésique' : (q.canal_dominant ?? 'En cours…')}
+
             </p>
           </CardContent>
         </Card>
@@ -100,7 +96,7 @@ export default function DashboardElevePage() {
                       <span className="text-sm font-medium text-gray-900">{s.matiere}</span>
                     </div>
                     <span className="text-sm text-gray-500">
-                      {new Date(s.date_session + 'T00:00:00').toLocaleDateString('fr-FR', {
+                      {new Date(s.date_session + 'T00:00:00Z').toLocaleDateString('fr-FR', {
                         weekday: 'short',
                         day: 'numeric',
                         month: 'short',
@@ -145,7 +141,7 @@ export default function DashboardElevePage() {
           <CardContent className="flex flex-wrap gap-2">
             {q.dates_examens.map((d) => (
               <Badge key={String(d)} className="bg-red-50 text-red-700">
-                {new Date(String(d) + 'T00:00:00').toLocaleDateString('fr-FR', {
+                {new Date(String(d) + 'T00:00:00Z').toLocaleDateString('fr-FR', {
                   day: 'numeric',
                   month: 'long',
                   year: 'numeric',

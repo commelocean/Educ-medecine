@@ -14,7 +14,7 @@ export default function VakBars({ scores }: { scores: Record<string, number> }) 
     <div className="space-y-5">
       {CANAUX.map((canal) => {
         const eleve =
-          scores[canal] ?? (canal === 'Kinesthesique' ? scores['Kinesthésique'] : undefined) ?? 0
+          scores[canal] ?? 0
         const national = REFERENCE_NATIONALE_VAK[canal]
         return (
           <div key={canal}>

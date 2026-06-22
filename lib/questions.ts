@@ -42,10 +42,10 @@ export const IDENTITY_QUESTIONS: Question[] = [
   { id: 'Q34', groupe: 'Auditif', label: "J'ai régulièrement besoin de me parler à voix haute ou à voix basse pour structurer mes idées.", n8nKey: "Q34 (Auditif) — J'ai régulièrement besoin de me parler à voix haute ou à voix basse pour structurer mes idées." },
   { id: 'Q35', groupe: 'Auditif', label: "Je suis particulièrement perturbé lorsque je lis ou réfléchis s'il y a un bruit de fond ou des discussions à côté.", n8nKey: "Q35 (Auditif) — Je suis particulièrement perturbé lorsque je lis ou réfléchis s'il y a un bruit de fond ou des discussions à côté." },
   { id: 'Q36', groupe: 'Auditif', label: "Pour m'informer, je préfère écouter des podcasts ou des explications de vive voix plutôt que de lire un long texte.", n8nKey: "Q36 (Auditif) — Pour m'informer, je préfère écouter des podcasts ou des explications de vive voix plutôt que de lire un long texte." },
-  { id: 'Q37', groupe: 'Kinesthésique', label: "Pour comprendre le fonctionnement d'un nouvel appareil, je dois le manipuler physiquement et faire des essais.", n8nKey: "Q37 (Kinesthésique) — Pour comprendre le fonctionnement d'un nouvel appareil, je dois le manipuler physiquement et faire des essais." },
-  { id: 'Q38', groupe: 'Kinesthésique', label: "J'ai beaucoup de mal à rester assis immobile ; j'ai besoin de marcher, de gesticuler ou de manipuler un objet.", n8nKey: "Q38 (Kinesthésique) — J'ai beaucoup de mal à rester assis immobile ; j'ai besoin de marcher, de gesticuler ou de manipuler un objet." },
-  { id: 'Q39', groupe: 'Kinesthésique', label: "Mes souvenirs marquants sont rattachés à des sensations physiques, des odeurs ou à l'ambiance globale du moment.", n8nKey: "Q39 (Kinesthésique) — Mes souvenirs marquants sont rattachés à des sensations physiques, des odeurs ou à l'ambiance globale du moment." },
-  { id: 'Q40', groupe: 'Kinesthésique', label: "Je m'exprime tout naturellement en faisant de nombreux gestes avec mes mains pour illustrer mes propos.", n8nKey: "Q40 (Kinesthésique) — Je m'exprime tout naturellement en faisant de nombreux gestes avec mes mains pour illustrer mes propos." },
+  { id: 'Q37', groupe: 'Kinesthesique', label: "Pour comprendre le fonctionnement d'un nouvel appareil, je dois le manipuler physiquement et faire des essais.", n8nKey: "Q37 (Kinesthésique) — Pour comprendre le fonctionnement d'un nouvel appareil, je dois le manipuler physiquement et faire des essais." },
+  { id: 'Q38', groupe: 'Kinesthesique', label: "J'ai beaucoup de mal à rester assis immobile ; j'ai besoin de marcher, de gesticuler ou de manipuler un objet.", n8nKey: "Q38 (Kinesthésique) — J'ai beaucoup de mal à rester assis immobile ; j'ai besoin de marcher, de gesticuler ou de manipuler un objet." },
+  { id: 'Q39', groupe: 'Kinesthesique', label: "Mes souvenirs marquants sont rattachés à des sensations physiques, des odeurs ou à l'ambiance globale du moment.", n8nKey: "Q39 (Kinesthésique) — Mes souvenirs marquants sont rattachés à des sensations physiques, des odeurs ou à l'ambiance globale du moment." },
+  { id: 'Q40', groupe: 'Kinesthesique', label: "Je m'exprime tout naturellement en faisant de nombreux gestes avec mes mains pour illustrer mes propos.", n8nKey: "Q40 (Kinesthésique) — Je m'exprime tout naturellement en faisant de nombreux gestes avec mes mains pour illustrer mes propos." },
 ]
 
 export interface ScheduleField {
@@ -87,5 +87,5 @@ export const GROUPE_META: Record<string, { emoji: string; bg: string; border: st
   'Émotionnel':   { emoji: '💜', bg: 'bg-orange-50',  border: 'border-orange-200',  text: 'text-orange-700',  radar: '#F97316' },
   Visuel:         { emoji: '👁️', bg: 'bg-cyan-50',    border: 'border-cyan-200',    text: 'text-cyan-700',    radar: '#06B6D4' },
   Auditif:        { emoji: '👂', bg: 'bg-violet-50',  border: 'border-violet-200',  text: 'text-violet-700',  radar: '#7C3AED' },
-  'Kinesthésique':{ emoji: '🤲', bg: 'bg-teal-50',    border: 'border-teal-200',    text: 'text-teal-700',    radar: '#14B8A6' },
+  Kinesthesique:  { emoji: '🤲', bg: 'bg-teal-50',    border: 'border-teal-200',    text: 'text-teal-700',    radar: '#14B8A6' },
 }
