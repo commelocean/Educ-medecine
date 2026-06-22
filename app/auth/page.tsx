@@ -48,20 +48,27 @@ function AuthForm() {
           setLoading(false)
           return
         }
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
+        const res = await fetch(
+          'https://gbycqybfkkxcbpvqohne.supabase.co/functions/v1/signup',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              password,
               prenom,
               nom,
               date_naissance: dateNaissance,
               parent_email: estMineur ? parentEmail : null,
               consentement_parental: estMineur ? consentement : null,
-            },
-          },
-        })
-        if (error) throw error
+            }),
+          }
+        )
+        const result = await res.json()
+        if (!res.ok) throw new Error(result.error || "Erreur lors de la création du compte.")
+        // Connexion immédiate (email déjà confirmé côté serveur)
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+        if (signInError) throw signInError
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
