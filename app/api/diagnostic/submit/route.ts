@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       const text = await upstream.text().catch(() => '')
       console.error('n8n webhook error', upstream.status, text)
       return NextResponse.json(
-        { error: 'Le moteur de diagnostic est indisponible. Veuillez réessayer.' },
+        { error: `Le moteur de diagnostic est indisponible (HTTP ${upstream.status}). Vérifiez que le workflow n8n est activé.` },
         { status: 502 }
       )
     }
