@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     !body.dates_examens.every((d) => ISO_DATE.test(d))
   ) {
     return NextResponse.json(
-      { error: 'Les dates d'examens doivent être au format YYYY-MM-DD.' },
+      { error: "Les dates d'examens doivent être au format YYYY-MM-DD." },
       { status: 400 }
     )
   }
