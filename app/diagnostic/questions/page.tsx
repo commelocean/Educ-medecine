@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
-// 3 sections : identité 1/2 (Q01-Q20), identité 2/2 (Q21-Q28), canaux VAK (Q29-Q40)
+// 3 sections : identité 1/2 (Q01-Q14), identité 2/2 (Q15-Q28), canaux VAK (Q29-Q40)
 const SECTIONS = [
   { titre: 'Votre personnalité (1/2)', questions: IDENTITY_QUESTIONS.slice(0, 14) },
   { titre: 'Votre personnalité (2/2)', questions: IDENTITY_QUESTIONS.slice(14, 28) },

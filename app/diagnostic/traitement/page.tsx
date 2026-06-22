@@ -114,7 +114,9 @@ function Traitement() {
     )
   }
 
-  if (foundId) return null
+  if (foundId) return (
+    <div className="py-16 text-center text-gray-600 text-sm">Redirection en cours…</div>
+  )
 
   return (
     <div className="py-16 text-center">
@@ -132,7 +134,7 @@ function Traitement() {
 
 export default function TraitementPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="py-16 text-center text-sm text-gray-500">Chargement…</div>}>
       <Traitement />
     </Suspense>
   )

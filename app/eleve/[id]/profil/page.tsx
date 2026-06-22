@@ -15,7 +15,7 @@ export default function ProfilPage() {
   if (!q) return <Introuvable />
 
   const profil = q.profils?.[0]
-  const preuves = Array.isArray(profil?.preuves_bulletin) ? profil!.preuves_bulletin : []
+  const preuves = Array.isArray(profil?.preuves_bulletin) ? profil.preuves_bulletin : []
 
   return (
     <div>

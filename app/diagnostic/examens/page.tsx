@@ -66,7 +66,7 @@ export default function ExamensPage() {
                 >
                   <span className="text-sm font-medium text-gray-800">
                     📅{' '}
-                    {new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', {
+                    {new Date(d + 'T00:00:00Z').toLocaleDateString('fr-FR', {
                       weekday: 'long',
                       day: 'numeric',
                       month: 'long',

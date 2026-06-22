@@ -10,12 +10,17 @@ export function useQuestionnaire(id: string | undefined) {
   useEffect(() => {
     if (!id) return
     let active = true
-    fetchQuestionnaireComplet(id).then((d) => {
-      if (active) {
-        setData(d)
-        setLoading(false)
-      }
-    })
+    fetchQuestionnaireComplet(id)
+      .then((d) => {
+        if (active) {
+          setData(d)
+          setLoading(false)
+        }
+      })
+      .catch((err) => {
+        console.error('useQuestionnaire fetch error', err)
+        if (active) setLoading(false)
+      })
     return () => {
       active = false
     }

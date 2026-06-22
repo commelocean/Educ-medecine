@@ -11,7 +11,12 @@ export default function BulletinElevePage() {
   const [bulletins, setBulletins] = useState<BulletinComplet[] | null>(null)
 
   useEffect(() => {
-    fetchBulletins(id).then(setBulletins)
+    fetchBulletins(id)
+      .then(setBulletins)
+      .catch((err) => {
+        console.error('fetchBulletins error', err)
+        setBulletins([])
+      })
   }, [id])
 
   if (bulletins === null) return <Chargement />

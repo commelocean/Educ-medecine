@@ -26,11 +26,18 @@ function ListeEleves() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase
-      .from('eleves')
-      .select('*, questionnaires(*, profils(id))')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => setEleves((data ?? []) as Ligne[]))
+    ;(async () => {
+      try {
+        const { data } = await supabase
+          .from('eleves')
+          .select('*, questionnaires(*, profils(id))')
+          .order('created_at', { ascending: false })
+        setEleves((data ?? []) as Ligne[])
+      } catch (err) {
+        console.error('admin eleves fetch error', err)
+        setEleves([])
+      }
+    })()
   }, [])
 
   const filtres = useMemo(() => {

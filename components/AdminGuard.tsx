@@ -12,17 +12,22 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      const allowed = ADMIN_EMAILS
-        .split(',')
-        .map((e) => e.trim().toLowerCase())
-        .filter(Boolean)
-      const isAdmin =
-        user &&
-        (user.app_metadata?.role === 'admin' ||
-          allowed.includes((user.email ?? '').toLowerCase()))
-      setStatus(isAdmin ? 'ok' : 'denied')
-    })
+    supabase.auth.getUser()
+      .then(({ data: { user } }) => {
+        const allowed = ADMIN_EMAILS
+          .split(',')
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean)
+        const isAdmin =
+          user &&
+          (user.app_metadata?.role === 'admin' ||
+            allowed.includes((user.email ?? '').toLowerCase()))
+        setStatus(isAdmin ? 'ok' : 'denied')
+      })
+      .catch((err) => {
+        console.error('AdminGuard auth error', err)
+        setStatus('denied')
+      })
   }, [])
 
   if (status === 'loading') return <Chargement />

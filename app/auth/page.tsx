@@ -198,7 +198,7 @@ function AuthForm() {
 
 export default function AuthPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="py-16 text-center text-sm text-gray-500">Chargement…</div>}>
       <AuthForm />
     </Suspense>
   )
