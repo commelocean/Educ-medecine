@@ -65,7 +65,13 @@ function AuthForm() {
           }
         )
         const result = await res.json()
-        if (!res.ok) throw new Error(result.error || "Erreur lors de la création du compte.")
+        if (!res.ok) {
+          if (res.status === 409) {
+            setMode('login')
+            throw new Error(result.error || "Un compte existe déjà avec cet email. Veuillez vous connecter.")
+          }
+          throw new Error(result.error || "Erreur lors de la création du compte.")
+        }
         // Connexion immédiate (email déjà confirmé côté serveur)
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
         if (signInError) throw signInError
