@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
       groupe: q.groupe,
       reponse: body.reponses[q.id],
     })),
+    // Flat map expected by n8n score nodes (e.g. payload.Q01 === 'OUI')
+    ...Object.fromEntries(IDENTITY_QUESTIONS.map((q) => [q.id, body.reponses[q.id]])),
     emploi_du_temps: body.emploi_du_temps ?? {},
     dates_examens: body.dates_examens,
     volume_chapitres_jour: body.volume_chapitres_jour ?? '',
