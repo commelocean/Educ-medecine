@@ -11,7 +11,10 @@ export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
   const accessToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
 
+  console.log('[diagnostic/submit] authHeader present:', !!authHeader, '| token present:', !!accessToken)
+
   if (!accessToken) {
+    console.log('[diagnostic/submit] 401 — no Bearer token in Authorization header')
     return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
   }
 
@@ -19,6 +22,8 @@ export async function POST(request: NextRequest) {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
   })
   const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken)
+
+  console.log('[diagnostic/submit] getUser result — user:', user?.id ?? null, '| error:', authError?.message ?? null)
 
   if (!user || authError) {
     return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
