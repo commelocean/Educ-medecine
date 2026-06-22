@@ -1,0 +1,1075 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        -320,
+        -512
+      ],
+      "id": "d5c4922f-ce1e-4331-a412-5027c17246f8",
+      "name": "Merge scores + bulletin"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fusionne scores (input 0) + bulletin structuré (input 1)\nconst scoresItem = $input.first().json;\nconst bulletinItem = $input.last().json;\n\nconst bulletin_structure = bulletinItem && bulletinItem.bulletin_structure !== undefined\n  ? bulletinItem.bulletin_structure\n  : null;\n\nconst today = new Date().toISOString().slice(0, 10);\n\n// Construit le prompt utilisateur complet pour le LLM profil+planning\nconst eleve   = scoresItem.eleve || {};\nconst scores  = scoresItem.scores || {};\nconst edt     = scoresItem.emploi_du_temps || {};\nconst examens = scoresItem.dates_examens || [];\n\nconst promptLines = [\n  'Analyse cet élève et produis le JSON profil+planning attendu.',\n  '',\n  '## Identité élève',\n  '- Prénom : ' + (eleve.prenom || 'N/A'),\n  '- Nom : '    + (eleve.nom    || 'N/A'),\n  '- Email : '  + (eleve.email  || 'N/A'),\n  '',\n  '## Scores déterministes du questionnaire (à reprendre tels quels)',\n  JSON.stringify(scores, null, 2),\n  '',\n  '## Emploi du temps déclaré',\n  JSON.stringify(edt, null, 2),\n  '',\n  '## Dates d examens',\n  examens.length > 0 ? examens.join(', ') : 'Aucune date communiquée',\n  '',\n  '## Bulletin scolaire (structuré)',\n  bulletin_structure ? JSON.stringify(bulletin_structure, null, 2) : 'Aucun bulletin fourni',\n  '',\n  '## Date du jour',\n  today,\n  '',\n  '## Mission',\n  '1. Reprends les % identité et VAK déjà calculés dans scores (NE LES RECALCULE PAS).',\n  '2. Identifie la motivation dominante d après le bulletin (si dispo) + le profil identité.',\n  '3. Rédige la synthèse narrative dans le style du rapport Kim (4-6 phrases, cite le bulletin si dispo).',\n  '4. Construis le planning hebdo type en respectant l emploi du temps déclaré.',\n  '5. Génère les sessions J (J0, J1, J7, J14, J30, J60) entre aujourd hui et la première date d examen.',\n  '6. Volume journalier selon Q47. Cours uniquement lundi matin -> samedi midi.',\n  '7. Pour chaque session, 2-3 techniques VAK adaptées au profil (priorité canal dominant).',\n  '',\n  'Renvoie UNIQUEMENT le JSON, sans markdown.'\n];\n\nreturn [{\n  json: {\n    eleve,\n    scores,\n    emploi_du_temps: edt,\n    dates_examens: examens,\n    bulletin_structure,\n    today,\n    user_prompt: promptLines.join('\\n')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        -512
+      ],
+      "id": "de16e098-3e38-48e5-a93f-ad8fd1a2ac1b",
+      "name": "Build Agent Input"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mistral.ai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer WGz1OfvFzQl9n9yIFzHr9FpqP0FFnWxW"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: 'mistral-small-latest',\n  temperature: 0.2,\n  response_format: { type: 'json_object' },\n  messages: [\n    {\n      role: 'system',\n      content: 'Tu es un expert en neuropédagogie spécialisé dans la méthode \"Les 7 profils d apprentissage\" de Jean-François Michel (éditions Eyrolles), et dans la méthode des J (répétition espacée) utilisée dans les facultés de médecine françaises (PASS/L.AS).\\n\\n## RÉFÉRENTIEL — 7 profils d identité\\n\\n1. Perfectionniste : besoin de structure, d ordre, de rigueur. Compulsion : faire bien. Marqueurs : sérieux, appliqué, soucieux de comprendre, attitude exemplaire, posture active en classe. Risque : lenteur par excès de scrupule.\\n2. Aimable : besoin d harmonie et d approbation. Évite le conflit, rend service. Risque : se laisse déborder, manque d affirmation.\\n3. Dynamique : motivé par le défi, le concours, la valorisation publique. Action avant réflexion. Risque : impatience, manque de profondeur.\\n4. Rebelle : besoin de sens, refuse l autorité non justifiée. Provoque les débats. Risque : conflits inutiles, démotivation face aux règles arbitraires.\\n5. Intellectuel : besoin d isolement, analyse logique, observation silencieuse. Difficulté à exprimer ses émotions. Risque : déconnecté du concret, isolement.\\n6. Enthousiaste : besoin de liberté et de nouveauté. Démarre beaucoup, finit peu. Humour. Risque : dispersion, projets inachevés.\\n7. Émotionnel : énergie liée à l humeur. Sensibilité esthétique, originalité, hypersensibilité aux remarques. Risque : volatilité.\\n\\n## RÉFÉRENTIEL — 3 canaux d apprentissage (VAK)\\n\\n- Visuel (V) : retient images, schémas, couleurs, plans. Notes structurées avec flèches et codes couleur.\\n- Auditif (A) : retient sons, intonations, paroles. Apprend en écoutant en amphi, en se parlant à voix haute, par podcasts.\\n- Kinesthésique (K) : retient par le mouvement, le toucher, les sensations physiques. Besoin de manipuler, gesticuler.\\n\\n## RÉFÉRENTIEL — Moteurs de motivation (à identifier d après le profil + bulletin)\\n\\n- Quelle utilité ? : motivé par l application concrète au projet futur (typique des projets professionnels clairs comme médecine).\\n- Faire plaisir : motivé par l approbation des proches.\\n- Compétition : motivé par le classement, la performance comparée.\\n- Curiosité : motivé par la compréhension intrinsèque.\\n- Récompense : motivé par les gains tangibles.\\n\\n## MÉTHODE DES J (répétition espacée)\\n\\nAprès un cours assimilé à J0, les rappels actifs ont lieu à : J1, J7, J14, J30, J60.\\n- J0 : Encodage initial (cours suivi en classe ou autoformation).\\n- J1 : Premier rappel actif le lendemain — exploite la consolidation par le sommeil (hippocampe -> néocortex).\\n- J7 : Deuxième rappel à J+7 — consolide.\\n- J14 : Rappel intermédiaire.\\n- J30 : Rappel de rétention long terme.\\n- J60 : Ancrage long terme.\\n\\n## CODE COULEUR DU PLANNING\\n\\n- J0 = Bleu Pastel D9E1F2\\n- J1 = Jaune Pastel FFF2CC\\n- J7 = Vert Pastel E2EFDA\\n- J14 = Orange Pastel FCE4D6\\n- J30 = Violet Pastel E1D5E7\\n- J60 = Violet Pastel E1D5E7\\n- Sommeil/repas/transport/sport/loisirs = Gris F2F2F2\\n\\n## CONTRAINTES PLANNING\\n\\n- Les cours académiques ont lieu uniquement du lundi matin au samedi midi.\\n- Les après-midis du week-end sont préservés pour loisirs, sport et consolidation longue.\\n- Tu respectes l emploi du temps personnel fourni (sport, loisirs, sommeil, repas).\\n- Tu intègres les dates d examens fournies comme bornes du planning.\\n- Tu adaptes le volume de révision selon Q47 (chapitres/jour).\\n\\n## INSTRUCTIONS DE SORTIE\\n\\nTu produis un JSON strict, sans markdown, sans backticks, qui contient EXACTEMENT cette structure :\\n\\n{\\n  \"profil\": {\\n    \"identitedominante\": \"string\",\\n    \"identitesecondaire\": \"string\",\\n    \"scoresidentitepct\": {\\n      \"Perfectionniste\": 0,\\n      \"Aimable\": 0,\\n      \"Dynamique\": 0,\\n      \"Rebelle\": 0,\\n      \"Intellectuel\": 0,\\n      \"Enthousiaste\": 0,\\n      \"Émotionnel\": 0\\n    },\\n    \"canauxvakpct\": {\\n      \"Visuel\": 0,\\n      \"Auditif\": 0,\\n      \"Kinesthesique\": 0\\n    },\\n    \"canaldominant\": \"string\",\\n    \"motivation\": \"string\",\\n    \"synthesenarrative\": \"string\",\\n    \"conseilstrategique\": \"string\",\\n    \"preuvesbulletin\": [\"string\"]\\n  },\\n  \"planning\": {\\n    \"semainetype\": [\\n      {\\n        \"jour\": \"Lundi\",\\n        \"creneaux\": [\\n          {\\n            \"horaire\": \"07h00-07h30\",\\n            \"activite\": \"Réveil\",\\n            \"type\": \"physio\",\\n            \"couleur\": \"F2F2F2\"\\n          }\\n        ]\\n      }\\n    ],\\n    \"sessionsJ\": [\\n      {\\n        \"date\": \"YYYY-MM-DD\",\\n        \"type\": \"J0\",\\n        \"matiere\": \"libellé\",\\n        \"dureemin\": 30,\\n        \"couleur\": \"D9E1F2\",\\n        \"techniquesVAK\": [\"string\"]\\n      }\\n    ],\\n    \"examenscibles\": [\"YYYY-MM-DD\"],\\n    \"notesmethodo\": \"string\"\\n  }\\n}\\n\\nTu ne renvoies QUE ce JSON, rien d autre. Pas de texte avant, pas de texte après, pas de balises markdown.'\n    },\n    {\n      role: 'user',\n      content: $json.user_prompt\n    }\n  ]\n} }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        128,
+        -512
+      ],
+      "id": "ed6f65d0-a3ba-4e0a-89e3-25db8706b1b6",
+      "name": "AI profil planning HTTP",
+      "alwaysOutputData": true,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse la réponse Mistral chat completion en JSON profil+planning\nconst resp = $input.first().json;\nconst built = $('Build Agent Input').first().json || {};\n\nlet content = '';\ntry {\n  content = resp.choices && resp.choices[0] && resp.choices[0].message ? resp.choices[0].message.content : '';\n} catch(e) { content = ''; }\n\nif (!content) {\n  throw new Error('Réponse Mistral vide ou invalide : ' + JSON.stringify(resp).slice(0, 500));\n}\n\nlet cleaned = String(content).trim()\n  .replace(/^```json\\s*/i, '')\n  .replace(/^```\\s*/, '')\n  .replace(/```\\s*$/, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  const m = cleaned.match(/\\{[\\s\\S]*\\}/);\n  if (m) {\n    try { parsed = JSON.parse(m[0]); }\n    catch(e2) {\n      throw new Error('Impossible de parser le JSON Mistral : ' + e2.message + ' | content: ' + cleaned.slice(0, 500));\n    }\n  } else {\n    throw new Error('Aucun JSON détecté dans la réponse Mistral. Content: ' + cleaned.slice(0, 500));\n  }\n}\n\nreturn [{\n  json: {\n    eleve: built.eleve,\n    profil: parsed.profil,\n    planning: parsed.planning,\n    scoresdeterministes: built.scores,\n    bulletinstructure: built.bulletin_structure || null,\n    generatedat: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        -512
+      ],
+      "id": "7111da71-6959-4b12-ab00-3146510dfac4",
+      "name": "Parse Agent Output"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "88f8f497-48ed-4925-904a-8fa0d9ab3250",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2336,
+        -512
+      ],
+      "id": "9b50b11f-23bd-4b99-8532-24b3be881f9a",
+      "name": "Webhook",
+      "webhookId": "88f8f497-48ed-4925-904a-8fa0d9ab3250"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\n// Supporte les 2 cas : payload direct ou payload dans body (Webhook)\nconst payload = input.body && typeof input.body === 'object' ? input.body : input;\n\nconst eleve = payload.eleve || {};\nconst reponses = Array.isArray(payload.reponses) ? payload.reponses : [];\nconst emploi_du_temps_src = payload.emploi_du_temps || {};\nconst dates_examens_src = Array.isArray(payload.dates_examens) ? payload.dates_examens : [];\n\nconst groupsMap = {\n  Perfectionniste: ['Q01','Q02','Q03','Q04'],\n  Aimable: ['Q05','Q06','Q07','Q08'],\n  Dynamique: ['Q09','Q10','Q11','Q12'],\n  Rebelle: ['Q13','Q14','Q15','Q16'],\n  Intellectuel: ['Q17','Q18','Q19','Q20'],\n  Enthousiaste: ['Q21','Q22','Q23','Q24'],\n  'Émotionnel': ['Q25','Q26','Q27','Q28'],\n  Visuel: ['Q29','Q30','Q31','Q32'],\n  Auditif: ['Q33','Q34','Q35','Q36'],\n  Kinesthesique: ['Q37','Q38','Q39','Q40'],\n};\n\nconst repMap = {};\nfor (const r of reponses) {\n  if (!r || !r.question_id) continue;\n  repMap[r.question_id] = String(r.reponse || '').toUpperCase().trim();\n}\n\nfunction isOui(qid) {\n  const v = repMap[qid] || 'NON';\n  return ['OUI', 'YES', 'TRUE', '1'].includes(v);\n}\n\nfunction scoreGroup(qids) {\n  return qids.reduce((acc, qid) => acc + (isOui(qid) ? 1 : 0), 0);\n}\n\n// Identité\nconst identite_raw = {\n  Perfectionniste: scoreGroup(groupsMap.Perfectionniste),\n  Aimable: scoreGroup(groupsMap.Aimable),\n  Dynamique: scoreGroup(groupsMap.Dynamique),\n  Rebelle: scoreGroup(groupsMap.Rebelle),\n  Intellectuel: scoreGroup(groupsMap.Intellectuel),\n  Enthousiaste: scoreGroup(groupsMap.Enthousiaste),\n  'Émotionnel': scoreGroup(groupsMap['Émotionnel']),\n};\n\nconst total_identite = Object.values(identite_raw).reduce((a, b) => a + b, 0);\nconst identite_pct = {};\nfor (const [k, v] of Object.entries(identite_raw)) {\n  identite_pct[k] = total_identite > 0 ? Math.round((v / total_identite) * 1000) / 10 : 0;\n}\n\nconst sortedIdent = Object.entries(identite_raw).sort((a, b) => b[1] - a[1]);\nconst identite_dominante = sortedIdent[0]?.[0] || 'Perfectionniste';\nconst identite_secondaire = sortedIdent[1]?.[0] || 'Aimable';\n\n// VAK\nconst vak_raw = {\n  Visuel: scoreGroup(groupsMap.Visuel),\n  Auditif: scoreGroup(groupsMap.Auditif),\n  Kinesthesique: scoreGroup(groupsMap.Kinesthesique),\n};\n\nconst total_vak = Object.values(vak_raw).reduce((a, b) => a + b, 0);\nlet vak_pct;\n\nif (total_vak === 0) {\n  vak_pct = {\n    Visuel: 58,\n    Auditif: 27,\n    Kinesthesique: 15,\n    _note: 'Moyenne nationale par défaut'\n  };\n} else {\n  vak_pct = {\n    Visuel: Math.round((vak_raw.Visuel / total_vak) * 1000) / 10,\n    Auditif: Math.round((vak_raw.Auditif / total_vak) * 1000) / 10,\n    Kinesthesique: Math.round((vak_raw.Kinesthesique / total_vak) * 1000) / 10,\n  };\n}\n\nconst canal_dominant = Object.entries(vak_pct)\n  .filter(([k]) => !k.startsWith('_'))\n  .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Visuel';\n\n// Emploi du temps\nconst emploi_du_temps = {\n  ...emploi_du_temps_src,\n  Q47: payload.volume_chapitres_jour || emploi_du_temps_src.Q47 || null,\n  Q48: payload.duree_transport || emploi_du_temps_src.Q48 || null,\n};\n\n// Dates\nconst dates_examens = dates_examens_src;\nconst dates_examens_raw = Array.isArray(dates_examens_src)\n  ? dates_examens_src.join(', ')\n  : String(dates_examens_src || '');\n\n// Bulletin\nconst bin = $binary || {};\nconst binKeys = Object.keys(bin);\nconst bulletinBinKey =\n  binKeys.find(k => k.toLowerCase().includes('bulletin')) ||\n  (binKeys.length > 0 ? binKeys[0] : null);\n\nconst hasBulletinBinary = !!bulletinBinKey;\nconst bulletinBase64 = payload.bulletin_base64 || null;\nconst hasBulletin = hasBulletinBinary || !!bulletinBase64;\n\nreturn [{\n  json: {\n    eleve: {\n      prenom: eleve.prenom || '',\n      nom: eleve.nom || '',\n      email: eleve.email || '',\n      date_naissance: eleve.date_naissance || null\n    },\n    scores: {\n      identite: {\n        raw: identite_raw,\n        pct: identite_pct,\n        dominante: identite_dominante,\n        secondaire: identite_secondaire\n      },\n      vak: {\n        raw: vak_raw,\n        pct: vak_pct,\n        dominant: canal_dominant\n      }\n    },\n    emploi_du_temps,\n    dates_examens,\n    dates_examens_raw,\n    has_bulletin: hasBulletin,\n    bulletin_bin_key: bulletinBinKey,\n    bulletin_base64: bulletinBase64,\n    moyennes_nationales: {\n      identite: {\n        Perfectionniste: 22,\n        Aimable: 18,\n        'Émotionnel': 16,\n        Intellectuel: 14,\n        Enthousiaste: 13,\n        Dynamique: 10,\n        Rebelle: 7\n      },\n      vak: {\n        Visuel: 58,\n        Auditif: 27,\n        Kinesthesique: 15\n      }\n    }\n  },\n  binary: bin\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -512
+      ],
+      "id": "de2376df-11d5-43a4-ab1a-3e4d4080033f",
+      "name": "Build eleve row"
+    },
+    {
+      "parameters": {
+        "tableId": "eleves",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "prenom",
+              "fieldValue": "={{ $json.eleve.prenom }}"
+            },
+            {
+              "fieldId": "nom",
+              "fieldValue": "={{ $json.eleve.nom }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.eleve.email }}"
+            },
+            {
+              "fieldId": "date_naissance",
+              "fieldValue": "={{ $json.eleve.date_naissance }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        800,
+        -512
+      ],
+      "id": "aad71130-286a-4439-aa4c-75761ace0072",
+      "name": "Insert eleve",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8IPnGaU2dPKa5Xzt",
+          "name": "Supabase account Xuan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit la ligne questionnaires (FK eleve_id)\n  var answers = {};\n  try { answers = $('On form submission1').first().json; } catch(e) {\n    try { var w = $('Webhook').first().json; answers = (w && w.body) ? w.body : (w||{}); } catch(e2) { answers = {}; }\n  }\nvar cs = $('Calcul scores (JS)').first().json;\nvar sc = cs.scores || {};\nvar ident = sc.identite || {};\nvar vak = sc.vak || {};\nvar edt = cs.emploi_du_temps || {};\nreturn [{ json: {\n  eleve_id: $('Insert eleve').first().json.id,\n  identite_dominante: ident.dominante || null,\n  identite_secondaire: ident.secondaire || null,\n  scores_identite_pct: ident.pct || {},\n  canaux_vak_pct: vak.pct || {},\n  canal_dominant: vak.dominant || null,\n  emploi_du_temps: edt,\n  dates_examens: cs.dates_examens || [],\n  volume_chapitres_jour: edt.Q47 || null,\n  duree_transport: edt.Q48 || null,\n  has_bulletin: cs.has_bulletin === true,\n  source_mode: answers.formMode || null,\n  submitted_at: answers.submittedAt || null\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        -512
+      ],
+      "id": "b5fb8d1e-93e9-4f0b-950c-ae9f363acb3f",
+      "name": "Build questionnaire row"
+    },
+    {
+      "parameters": {
+        "tableId": "questionnaires",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        -512
+      ],
+      "id": "97d8f761-ba77-44a6-b09d-bbce8f349a65",
+      "name": "Insert questionnaire",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8IPnGaU2dPKa5Xzt",
+          "name": "Supabase account Xuan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Eclate les 40 reponses Q01..Q40 en lignes reponses_questionnaire\n  var answers = {};\n  try { answers = $('On form submission1').first().json; } catch(e) {\n    try { var w = $('Webhook').first().json; answers = (w && w.body) ? w.body : (w||{}); } catch(e2) { answers = {}; }\n  }\nvar qid = $('Insert questionnaire').first().json.id;\nvar rows = [];\nfor (var key in answers) {\n  if (!Object.prototype.hasOwnProperty.call(answers, key)) continue;\n  var head = key.match(/^Q(\\d{1,2})\\b/);\n  if (!head) continue;\n  var num = parseInt(head[1], 10);\n  if (num < 1 || num > 40) continue;\n  var full = key.match(/^(Q\\d+)\\s*\\(([^)]*)\\)\\s*[\\u2014-]\\s*(.+)$/);\n  var qId, groupe, libelle;\n  if (full) { qId = full[1]; groupe = full[2]; libelle = full[3]; }\n  else { qId = 'Q' + ('0'+num).slice(-2); groupe = null; libelle = key; }\n  rows.push({ json: {\n    questionnaire_id: qid,\n    question_id: qId,\n    groupe: groupe,\n    libelle: libelle,\n    reponse: String(answers[key])\n  } });\n}\nreturn rows;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        -800
+      ],
+      "id": "ee42b14c-fd21-4ed9-9d01-fbd693ab5589",
+      "name": "Build reponses rows"
+    },
+    {
+      "parameters": {
+        "tableId": "reponses_questionnaire",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        -800
+      ],
+      "id": "ff2c2342-77f6-41cd-b3a8-46f0aa7d57a0",
+      "name": "Insert reponses",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8IPnGaU2dPKa5Xzt",
+          "name": "Supabase account Xuan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit la ligne profils (FK questionnaire_id)\nvar p = ($('Parse Agent Output').first().json.profil) || {};\nreturn [{ json: {\n  questionnaire_id: $('Insert questionnaire').first().json.id,\n  motivation: p.motivation || null,\n  synthese_narrative: p.synthesenarrative || null,\n  conseil_strategique: p.conseilstrategique || null,\n  preuves_bulletin: p.preuvesbulletin || []\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        -608
+      ],
+      "id": "5c1492a5-34b8-4a5c-9a54-9148af1cb0ca",
+      "name": "Build profil row"
+    },
+    {
+      "parameters": {
+        "tableId": "profils",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        -608
+      ],
+      "id": "d0199c4c-b631-4c25-8f95-38ab2858eaf4",
+      "name": "Insert profil",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8IPnGaU2dPKa5Xzt",
+          "name": "Supabase account Xuan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit la ligne plannings (FK questionnaire_id)\nvar pl = ($('Parse Agent Output').first().json.planning) || {};\nreturn [{ json: {\n  questionnaire_id: $('Insert questionnaire').first().json.id,\n  examens_cibles: pl.examenscibles || [],\n  notes_methodo: pl.notesmethodo || null\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        -416
+      ],
+      "id": "38188fd7-7250-4659-8c95-5a6fd36ed4ac",
+      "name": "Build planning row"
+    },
+    {
+      "parameters": {
+        "tableId": "plannings",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        -416
+      ],
+      "id": "b30c5806-db6b-41d6-8267-e98079f7cebc",
+      "name": "Insert planning",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8IPnGaU2dPKa5Xzt",
+          "name": "Supabase account Xuan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Eclate semainetype -> lignes planning_creneaux (FK planning_id)\nvar pl = ($('Parse Agent Output').first().json.planning) || {};\nvar planningId = $('Insert planning').first().json.id;\nvar valid = ['cours','revision','sport','loisirs','sommeil','repas','transport','physio'];\nvar rows = [];\nvar sem = pl.semainetype || [];\nfor (var i=0;i<sem.length;i++){\n  var day = sem[i]; var cr = day.creneaux || [];\n  for (var j=0;j<cr.length;j++){\n    var c = cr[j]; var t = String(c.type||'').toLowerCase().trim();\n    if (valid.indexOf(t) === -1){\n      if (t.indexOf('rev')>=0) t='revision';\n      else if (t.indexOf('cour')>=0) t='cours';\n      else if (t.indexOf('somm')>=0||t.indexOf('dort')>=0||t.indexOf('sleep')>=0) t='sommeil';\n      else if (t.indexOf('repas')>=0||t.indexOf('manger')>=0) t='repas';\n      else if (t.indexOf('transp')>=0) t='transport';\n      else if (t.indexOf('sport')>=0) t='sport';\n      else if (t.indexOf('lois')>=0) t='loisirs';\n      else t='physio';\n    }\n    rows.push({ json: {\n      planning_id: planningId,\n      jour: day.jour,\n      horaire: c.horaire,\n      activite: c.activite,\n      type: t,\n      couleur: c.couleur || null\n    } });\n  }\n}\nreturn rows;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        -512
+      ],
+      "id": "214d7a9f-074f-42a0-8690-47f2045b5f12",
+      "name": "Build creneaux rows"
+    },
+    {
+      "parameters": {
+        "tableId": "planning_creneaux",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2144,
+        -512
+      ],
+      "id": "dc80034b-297d-4d89-9725-1a434a2c7c6a",
+      "name": "Insert creneaux",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8IPnGaU2dPKa5Xzt",
+          "name": "Supabase account Xuan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Eclate sessionsJ -> lignes sessions_j (FK planning_id)\nvar pl = ($('Parse Agent Output').first().json.planning) || {};\nvar planningId = $('Insert planning').first().json.id;\nvar today;\ntry { today = $('Build Agent Input').first().json.today; } catch(e) { today = null; }\nif (!today) today = new Date().toISOString().slice(0,10);\nvar validJ = ['J0','J1','J7','J14','J30','J60'];\nvar rows = [];\nvar arr = pl.sessionsJ || [];\nfor (var i=0;i<arr.length;i++){\n  var s = arr[i];\n  var tj = String(s.type||'').toUpperCase().trim();\n  if (validJ.indexOf(tj) === -1) tj = 'J0';\n  var d = parseInt(s.dureemin, 10);\n  if (!isFinite(d) || d <= 0) d = null;\n  rows.push({ json: {\n    planning_id: planningId,\n    date_session: s.date || today,\n    type_j: tj,\n    matiere: s.matiere || 'N/A',\n    duree_min: d,\n    couleur: s.couleur || null,\n    techniques_vak: s.techniquesVAK || []\n  } });\n}\nreturn rows;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        -320
+      ],
+      "id": "2268b276-e6f8-4278-8acc-6ddd76d31180",
+      "name": "Build sessions J rows"
+    },
+    {
+      "parameters": {
+        "tableId": "sessions_j",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2144,
+        -320
+      ],
+      "id": "f67ed854-4e58-4591-8e1f-68fe78c3c6ce",
+      "name": "Insert sessions J",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8IPnGaU2dPKa5Xzt",
+          "name": "Supabase account Xuan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "has-bull",
+              "leftValue": "={{ Boolean($('Parse Agent Output').item.json.bulletinstructure) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1472,
+        -128
+      ],
+      "id": "cd54865b-e2c9-4749-98e6-0adc924668db",
+      "name": "IF bulletin a persister"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit la ligne bulletins (FK eleve_id + questionnaire_id)\n  var answers = {};\n  try { answers = $('On form submission1').first().json; } catch(e) {\n    try { var w = $('Webhook').first().json; answers = (w && w.body) ? w.body : (w||{}); } catch(e2) { answers = {}; }\n  }\nvar b = ($('Parse Agent Output').first().json.bulletinstructure) || {};\nvar filename = null;\nfor (var k in answers){\n  if (k.toLowerCase().indexOf('bulletin') >= 0 && answers[k] && typeof answers[k] === 'object'){\n    filename = answers[k].filename || null; break;\n  }\n}\nreturn [{ json: {\n  eleve_id: $('Insert eleve').first().json.id,\n  questionnaire_id: $('Insert questionnaire').first().json.id,\n  classe: b.classe || null,\n  eleve_nom_bulletin: b.eleve_nom_bulletin || null,\n  source_filename: filename\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        -128
+      ],
+      "id": "90ef8922-9581-412b-bd1a-4f87d228e110",
+      "name": "Build bulletin row"
+    },
+    {
+      "parameters": {
+        "tableId": "bulletins",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        -128
+      ],
+      "id": "2d2e83bb-52d5-4433-9189-5461eee6b8c8",
+      "name": "Insert bulletin",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8IPnGaU2dPKa5Xzt",
+          "name": "Supabase account Xuan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Eclate trimestres -> lignes bulletin_trimestres (FK bulletin_id)\nvar b = ($('Parse Agent Output').first().json.bulletinstructure) || {};\nvar bid = $('Insert bulletin').first().json.id;\nvar arr = b.trimestres || [];\nvar rows = [];\nfor (var i=0;i<arr.length;i++){\n  var t = arr[i];\n  rows.push({ json: {\n    bulletin_id: bid,\n    periode: t.periode || null,\n    moyenne_generale: (t.moyenne_generale === undefined ? null : t.moyenne_generale),\n    appreciation_globale: t.appreciation_globale || null\n  } });\n}\nreturn rows;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2144,
+        -128
+      ],
+      "id": "3bf69e9b-3258-4563-898d-f76edb05f6ab",
+      "name": "Build trimestres rows"
+    },
+    {
+      "parameters": {
+        "tableId": "bulletin_trimestres",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2368,
+        -128
+      ],
+      "id": "a260197e-eb6c-4eee-a46a-fb589ac743e6",
+      "name": "Insert trimestres",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8IPnGaU2dPKa5Xzt",
+          "name": "Supabase account Xuan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pour chaque trimestre insere, genere ses matieres (FK trimestre_id)\nvar b = ($('Parse Agent Output').first().json.bulletinstructure) || {};\nvar trimestres = b.trimestres || [];\nvar out = [];\nvar items = $input.all();\nfor (var i=0;i<items.length;i++){\n  var row = items[i].json;\n  var match = null;\n  for (var j=0;j<trimestres.length;j++){\n    if ((trimestres[j].periode||null) === (row.periode||null)) { match = trimestres[j]; break; }\n  }\n  var mats = (match && match.matieres) ? match.matieres : [];\n  for (var k=0;k<mats.length;k++){\n    var m = mats[k];\n    out.push({ json: {\n      trimestre_id: row.id,\n      nom: m.nom || 'N/A',\n      moyenne: (m.moyenne === undefined ? null : m.moyenne),\n      commentaire: m.commentaire || null\n    } });\n  }\n}\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2592,
+        -128
+      ],
+      "id": "d13698d3-7f35-4a18-a438-b52926ec4588",
+      "name": "Build matieres rows"
+    },
+    {
+      "parameters": {
+        "tableId": "bulletin_matieres",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2816,
+        -128
+      ],
+      "id": "e4902b55-4ef8-437c-9353-0f962164790f",
+      "name": "Insert matieres",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8IPnGaU2dPKa5Xzt",
+          "name": "Supabase account Xuan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mistral.ai/v1/files",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.MISTRAL_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "={{ $json.bulletin_bin_key }}"
+            },
+            {
+              "name": "purpose",
+              "value": "ocr"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1664,
+        -688
+      ],
+      "id": "4d7a0dbb-6407-4739-833a-3a12212da7e4",
+      "name": "Upload PDF Mistral",
+      "alwaysOutputData": true,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const uploadResp = $input.first().json;\nconst fileId = uploadResp.id || null;\n\nlet scoresData = {};\ntry { scoresData = $('Calcul scores (JS)1').first().json; } catch(e) {}\n\nreturn [{\n  json: {\n    ...scoresData,\n    mistral_file_id: fileId,\n    upload_ok: !!fileId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1392,
+        -640
+      ],
+      "id": "0ba0055a-fa6f-44dd-8b16-29708479add4",
+      "name": "Merge FileId + Scores"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ocrResp = $input.first().json;\nconst pages = ocrResp.pages || [];\nconst ocrText = pages.map(p => p.markdown || p.text || '').join('\\n\\n').trim()\n  || ocrResp.text || ocrResp.content || '';\n\nlet scoresData = {};\ntry { scoresData = $('Calcul scores (JS)1').first().json; } catch(e) {}\n\nreturn [{\n  json: {\n    ...scoresData,\n    ocr_text: ocrText,\n    ocr_ok: ocrText.length > 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        -544
+      ],
+      "id": "f50bdf55-a955-4033-9f4a-e6533ad7f352",
+      "name": "Merge OCR + Scores"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\n// Support both webhook-wrapped ({body: {...}}) and direct payloads\nconst formData = (raw.body && typeof raw.body === 'object') ? raw.body : raw;\n\nconst subgroups = {\n  A: ['Q01','Q02','Q03','Q04'],\n  B: ['Q05','Q06','Q07','Q08'],\n  C: ['Q09','Q10','Q11','Q12'],\n  D: ['Q13','Q14','Q15','Q16'],\n  E: ['Q17','Q18','Q19','Q20'],\n  F: ['Q21','Q22','Q23','Q24'],\n  G: ['Q25','Q26','Q27','Q28'],\n  H: ['Q29','Q30','Q31','Q32'],\n  I: ['Q33','Q34','Q35','Q36'],\n  J: ['Q37','Q38','Q39','Q40'],\n};\n\nconst labels = {\n  A: 'Perfectionniste', B: 'Aimable', C: 'Dynamique', D: 'Rebelle',\n  E: 'Intellectuel', F: 'Enthousiaste', G: 'Émotionnel',\n  H: 'Visuel', I: 'Auditif', J: 'Kinesthesique'\n};\n\nfunction getAnswer(qid) {\n  // 1. Direct key \"Q01\": \"OUI\" (format sent by the app)\n  if (formData[qid] !== undefined) {\n    const v = String(formData[qid]).toUpperCase().trim();\n    return (v === 'OUI' || v === 'YES' || v === 'TRUE' || v === '1') ? 'OUI' : 'NON';\n  }\n  // 2. Legacy format \"Q01 (label) — …\": \"OUI\"\n  const k = Object.keys(formData).find(key => key.startsWith(qid + ' ') || key.startsWith(qid + '('));\n  if (k) {\n    const v = String(formData[k]).toUpperCase().trim();\n    return (v === 'OUI' || v === 'YES' || v === 'TRUE' || v === '1') ? 'OUI' : 'NON';\n  }\n  // 3. reponses array [{id:\"Q01\", valeur:\"OUI\"}, ...]\n  if (Array.isArray(formData.reponses)) {\n    const rep = formData.reponses.find(r => r.id === qid || r.question_id === qid);\n    if (rep) {\n      const v = String(rep.valeur ?? rep.value ?? rep.reponse ?? '').toUpperCase().trim();\n      return (v === 'OUI' || v === 'YES' || v === 'TRUE' || v === '1') ? 'OUI' : 'NON';\n    }\n  }\n  return 'NON';\n}\n\nfunction scoreGroup(qids) {\n  return qids.reduce((acc, qid) => acc + (getAnswer(qid) === 'OUI' ? 1 : 0), 0);\n}\n\nconst identite_raw = {};\nfor (const sg of ['A','B','C','D','E','F','G']) {\n  identite_raw[labels[sg]] = scoreGroup(subgroups[sg]);\n}\nconst total_identite = Object.values(identite_raw).reduce((a,b) => a+b, 0);\nconst identite_pct = {};\nfor (const [k,v] of Object.entries(identite_raw)) {\n  identite_pct[k] = total_identite > 0 ? Math.round((v / total_identite) * 1000) / 10 : 0;\n}\nconst sortedIdent = Object.entries(identite_raw).sort((a,b) => b[1]-a[1]);\nconst identite_dominante  = sortedIdent[0][0];\nconst identite_secondaire = sortedIdent[1][0];\n\nconst vak_raw = {\n  Visuel:        scoreGroup(subgroups.H),\n  Auditif:       scoreGroup(subgroups.I),\n  Kinesthesique: scoreGroup(subgroups.J),\n};\nconst total_vak = vak_raw.Visuel + vak_raw.Auditif + vak_raw.Kinesthesique;\nlet vak_pct;\nif (total_vak === 0) {\n  vak_pct = { Visuel: 58, Auditif: 27, Kinesthesique: 15, _note: 'Moyenne nationale par défaut' };\n} else {\n  vak_pct = {\n    Visuel:        Math.round((vak_raw.Visuel        / total_vak) * 1000) / 10,\n    Auditif:       Math.round((vak_raw.Auditif       / total_vak) * 1000) / 10,\n    Kinesthesique: Math.round((vak_raw.Kinesthesique / total_vak) * 1000) / 10,\n  };\n}\nconst sortedVak = Object.entries(vak_raw).sort((a,b) => b[1]-a[1]);\nconst canal_dominant = sortedVak[0][0];\n\nreturn [{\n  json: {\n    identite_dominante,\n    identite_secondaire,\n    identite_pct,\n    vak_pct,\n    canal_dominant,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2128,
+        -608
+      ],
+      "id": "dbfee43f-a1d0-4fec-b4e3-68fcf684ba39",
+      "name": "Calcul scores (JS)1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bulletin-check",
+              "leftValue": "={{ $json.has_bulletin }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1872,
+        -432
+      ],
+      "id": "b6e56666-d251-4d84-a583-a859adb4be5e",
+      "name": "IF Bulletin Present1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mistral.ai/v1/ocr",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.MISTRAL_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"model\": \"mistral-ocr-latest\",\n  \"document\": {\n    \"type\": \"document_url\",\n    \"document_url\": \"https://api.mistral.ai/v1/files/\" + $json.mistral_file_id + \"/content\"\n  }\n} }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1216,
+        -544
+      ],
+      "id": "b7363b40-3653-438b-99aa-726a299d84e4",
+      "name": "Mistral OCR Bulletin1",
+      "alwaysOutputData": true,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mistral.ai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.MISTRAL_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => {\n  const ocrText = $json.ocr_text || '';\n  return {\n    model: 'mistral-small-latest',\n    temperature: 0.1,\n    response_format: { type: 'json_object' },\n    messages: [\n      {\n        role: 'system',\n        content: 'Tu es un extracteur de données structurées de bulletins scolaires français. Tu renvoies UNIQUEMENT du JSON valide, sans markdown ni backticks. Si un champ est absent, mets null.'\n      },\n      {\n        role: 'user',\n        content: 'Extrais un JSON STRICT depuis ce texte OCR de bulletin scolaire.\\nStructure attendue :{\"eleve_nom_bulletin\":\"...\",\"classe\":\"...\",\"trimestres\":[{\"periode\":\"...\",\"moyenne_generale\":null,\"matieres\":[{\"nom\":\"...\",\"moyenne\":null,\"commentaire\":\"...\"}],\"appreciation_globale\":\"...\"}]}\\n\\nTEXTE OCR :\\n' + ocrText\n      }\n    ]\n  };\n})() }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -768,
+        -544
+      ],
+      "id": "421d8364-9c0f-461e-a954-3970d9d4fdf5",
+      "name": "Structuration bulletin HTTP1",
+      "alwaysOutputData": true,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nlet content = '';\ntry { content = resp.choices[0].message.content || ''; } catch(e) { content = ''; }\n\nlet bulletinParsed = null;\nif (content) {\n  let cleaned = String(content).trim()\n    .replace(/^```json\\s*/i, '').replace(/^```\\s*/, '').replace(/```\\s*$/, '').trim();\n  try {\n    bulletinParsed = JSON.parse(cleaned);\n  } catch(e) {\n    const m = cleaned.match(/\\{[\\s\\S]*\\}/);\n    if (m) {\n      try { bulletinParsed = JSON.parse(m); }\n      catch(e2) { bulletinParsed = { raw_text: content, parse_error: e2.message }; }\n    } else {\n      bulletinParsed = { raw_text: content, parse_error: 'no JSON detected' };\n    }\n  }\n}\n\nlet scoresData = {};\ntry { scoresData = $('Calcul scores (JS)1').first().json; } catch(e) {}\n\nreturn [{\n  json: {\n    ...scoresData,\n    bulletin_structure: bulletinParsed\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        -544
+      ],
+      "id": "625ba1d7-500c-4621-bae0-6b438d7707ad",
+      "name": "Parse Bulletin Output1"
+    },
+    {
+      "parameters": {
+        "jsCode": "let scoresData = {};\ntry { scoresData = $('Calcul scores (JS)1').first().json; } catch(e) {}\n\nreturn [{\n  json: {\n    ...scoresData,\n    bulletin_structure: null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        -128
+      ],
+      "id": "60a07d96-22a3-4191-9fa6-cfb28c1183ca",
+      "name": "Fallback bulletin vide1"
+    }
+  ],
+  "connections": {
+    "Merge scores + bulletin": {
+      "main": [
+        [
+          {
+            "node": "Build Agent Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Agent Input": {
+      "main": [
+        [
+          {
+            "node": "AI profil planning HTTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI profil planning HTTP": {
+      "main": [
+        [
+          {
+            "node": "Parse Agent Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Agent Output": {
+      "main": [
+        [
+          {
+            "node": "Build eleve row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Calcul scores (JS)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build eleve row": {
+      "main": [
+        [
+          {
+            "node": "Insert eleve",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert eleve": {
+      "main": [
+        [
+          {
+            "node": "Build questionnaire row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build questionnaire row": {
+      "main": [
+        [
+          {
+            "node": "Insert questionnaire",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert questionnaire": {
+      "main": [
+        [
+          {
+            "node": "Build reponses rows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build profil row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build planning row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF bulletin a persister",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build reponses rows": {
+      "main": [
+        [
+          {
+            "node": "Insert reponses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build profil row": {
+      "main": [
+        [
+          {
+            "node": "Insert profil",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build planning row": {
+      "main": [
+        [
+          {
+            "node": "Insert planning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert planning": {
+      "main": [
+        [
+          {
+            "node": "Build creneaux rows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build sessions J rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build creneaux rows": {
+      "main": [
+        [
+          {
+            "node": "Insert creneaux",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build sessions J rows": {
+      "main": [
+        [
+          {
+            "node": "Insert sessions J",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF bulletin a persister": {
+      "main": [
+        [
+          {
+            "node": "Build bulletin row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build bulletin row": {
+      "main": [
+        [
+          {
+            "node": "Insert bulletin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert bulletin": {
+      "main": [
+        [
+          {
+            "node": "Build trimestres rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build trimestres rows": {
+      "main": [
+        [
+          {
+            "node": "Insert trimestres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert trimestres": {
+      "main": [
+        [
+          {
+            "node": "Build matieres rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build matieres rows": {
+      "main": [
+        [
+          {
+            "node": "Insert matieres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload PDF Mistral": {
+      "main": [
+        [
+          {
+            "node": "Merge FileId + Scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge FileId + Scores": {
+      "main": [
+        [
+          {
+            "node": "Mistral OCR Bulletin1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge OCR + Scores": {
+      "main": [
+        [
+          {
+            "node": "Structuration bulletin HTTP1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcul scores (JS)1": {
+      "main": [
+        [
+          {
+            "node": "IF Bulletin Present1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge scores + bulletin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Bulletin Present1": {
+      "main": [
+        [
+          {
+            "node": "Upload PDF Mistral",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fallback bulletin vide1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral OCR Bulletin1": {
+      "main": [
+        [
+          {
+            "node": "Merge OCR + Scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structuration bulletin HTTP1": {
+      "main": [
+        [
+          {
+            "node": "Parse Bulletin Output1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Bulletin Output1": {
+      "main": [
+        [
+          {
+            "node": "Merge scores + bulletin",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Fallback bulletin vide1": {
+      "main": [
+        [
+          {
+            "node": "Merge scores + bulletin",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7609c1140ee99eb4b59d3140ff385ed24791a9f310b4644ffa74bb0a3c5c1c58"
+  }
+}
