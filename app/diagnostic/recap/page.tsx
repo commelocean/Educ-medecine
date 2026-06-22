@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { useDiagnosticStore } from '@/lib/store'
 import { IDENTITY_QUESTIONS, SCHEDULE_FIELDS } from '@/lib/questions'
 import { Button } from '@/components/ui/button'
@@ -52,9 +53,15 @@ export default function RecapPage() {
     setError(null)
     setSubmitting(true)
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
       const res = await fetch('/api/diagnostic/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           reponses: store.reponses,
           emploi_du_temps: store.emploiDuTemps,
