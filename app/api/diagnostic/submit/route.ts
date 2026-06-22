@@ -9,8 +9,10 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 export async function POST(request: NextRequest) {
   const supabase = createClient()
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  const user = session?.user ?? null
 
   if (!user) {
     return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
