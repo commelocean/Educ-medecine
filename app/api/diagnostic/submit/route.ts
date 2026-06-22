@@ -11,10 +11,7 @@ export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
   const accessToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
 
-  console.log('[diagnostic/submit] authHeader present:', !!authHeader, '| token present:', !!accessToken)
-
   if (!accessToken) {
-    console.log('[diagnostic/submit] 401 — no Bearer token in Authorization header')
     return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
   }
 
@@ -23,14 +20,10 @@ export async function POST(request: NextRequest) {
   })
   const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken)
 
-  console.log('[diagnostic/submit] getUser result — user:', user?.id ?? null, '| error:', authError?.message ?? null)
-
   if (!user || authError) {
     return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
   }
 
-  // Valeur par défaut pour fonctionner sans configuration d'environnement ;
-  // une variable N8N_WEBHOOK_URL (Vercel / .env) reste prioritaire.
   const webhookUrl =
     process.env.N8N_WEBHOOK_URL ??
     'https://n8n-formation.isao.io/webhook/88f8f497-48ed-4925-904a-8fa0d9ab3250'
@@ -49,7 +42,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Corps de requête invalide.' }, { status: 400 })
   }
 
-  // Validation serveur
   const manquantes = IDENTITY_QUESTIONS.filter((q) => !body.reponses?.[q.id])
   if (manquantes.length > 0) {
     return NextResponse.json(
@@ -63,13 +55,18 @@ export async function POST(request: NextRequest) {
     !body.dates_examens.every((d) => ISO_DATE.test(d))
   ) {
     return NextResponse.json(
-      { error: 'Les dates d’examens doivent être au format YYYY-MM-DD.' },
+      { error: 'Les dates d'examens doivent être au format YYYY-MM-DD.' },
       { status: 400 }
     )
   }
 
+  // Génère l'ID côté app — n8n doit l'utiliser comme PK de la ligne questionnaire.
+  // Cela évite de dépendre du champ questionnaire_id dans la réponse n8n.
+  const questionnaire_id = crypto.randomUUID()
+
   const meta = (user.user_metadata ?? {}) as Record<string, string>
   const payload = {
+    questionnaire_id,
     eleve: {
       prenom: meta.prenom ?? '',
       nom: meta.nom ?? '',
@@ -105,24 +102,14 @@ export async function POST(request: NextRequest) {
       const text = await upstream.text().catch(() => '')
       console.error('n8n webhook error', upstream.status, text)
       return NextResponse.json(
-        { error: `Le moteur de diagnostic est indisponible (HTTP ${upstream.status}). Vérifiez que le workflow n8n est activé.` },
+        { error: `Le moteur de diagnostic est indisponible (HTTP ${upstream.status}).` },
         { status: 502 }
       )
     }
 
-    const data = (await upstream.json().catch(() => null)) as {
-      questionnaire_id?: string
-      status?: string
-    } | null
-
-    if (!data?.questionnaire_id) {
-      return NextResponse.json(
-        { error: 'Réponse inattendue du moteur de diagnostic.' },
-        { status: 502 }
-      )
-    }
-
-    return NextResponse.json({ questionnaire_id: data.questionnaire_id, status: 'ok' })
+    // On renvoie l'ID pré-généré sans dépendre du corps de la réponse n8n.
+    // n8n doit utiliser payload.questionnaire_id comme PK de la ligne questionnaire.
+    return NextResponse.json({ questionnaire_id, status: 'ok' })
   } catch (err) {
     console.error('n8n webhook failure', err)
     return NextResponse.json(
