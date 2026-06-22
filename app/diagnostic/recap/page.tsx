@@ -74,7 +74,7 @@ export default function RecapPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Erreur lors de la soumission.')
       store.reset()
-      router.push(`/diagnostic/traitement?id=${data.questionnaire_id}`)
+      router.push(`/diagnostic/traitement?t=${Date.now()}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue.')
       setSubmitting(false)

@@ -20,10 +20,12 @@ const MESSAGES = [
 function Traitement() {
   const router = useRouter()
   const params = useSearchParams()
-  const questionnaireId = params.get('id')
+  // submitted_at tells us the minimum creation time so we don't pick up an old questionnaire
+  const submittedAt = params.get('t') ? Number(params.get('t')) : null
   const [msgIdx, setMsgIdx] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [timedOut, setTimedOut] = useState(false)
+  const [foundId, setFoundId] = useState<string | null>(null)
   const startRef = useRef(Date.now())
 
   useEffect(() => {
@@ -36,23 +38,45 @@ function Traitement() {
   }, [])
 
   useEffect(() => {
-    if (!questionnaireId) return
     const supabase = createClient()
     let stopped = false
 
     async function poll() {
       if (stopped) return
-      const { data } = await supabase
-        .from('questionnaires')
-        .select('generated_at')
-        .eq('id', questionnaireId)
-        .maybeSingle()
 
-      if (data?.generated_at) {
-        stopped = true
-        router.push(`/eleve/${questionnaireId}`)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.email) {
+        if (Date.now() - startRef.current > TIMEOUT_MS) {
+          stopped = true
+          setTimedOut(true)
+        } else {
+          setTimeout(poll, POLL_MS)
+        }
         return
       }
+
+      // Find the most recent questionnaire for this user via the eleves join
+      // We look for one created after the form was submitted
+      const minCreatedAt = submittedAt
+        ? new Date(submittedAt - 5000).toISOString() // 5s buffer
+        : new Date(startRef.current - 5000).toISOString()
+
+      const { data } = await supabase
+        .from('questionnaires')
+        .select('id, eleves!inner(email)')
+        .eq('eleves.email', user.email)
+        .gte('created_at', minCreatedAt)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (data?.id) {
+        stopped = true
+        setFoundId(data.id)
+        router.push(`/eleve/${data.id}`)
+        return
+      }
+
       if (Date.now() - startRef.current > TIMEOUT_MS) {
         stopped = true
         setTimedOut(true)
@@ -65,18 +89,7 @@ function Traitement() {
     return () => {
       stopped = true
     }
-  }, [questionnaireId, router])
-
-  if (!questionnaireId) {
-    return (
-      <div className="py-16 text-center">
-        <p className="text-gray-600">Identifiant de questionnaire manquant.</p>
-        <Button className="mt-4" onClick={() => router.push('/onboarding')}>
-          Retour
-        </Button>
-      </div>
-    )
-  }
+  }, [router, submittedAt])
 
   if (timedOut) {
     return (
@@ -93,13 +106,15 @@ function Traitement() {
           <Button variant="outline" onClick={() => window.location.reload()}>
             Réessayer
           </Button>
-          <Button onClick={() => router.push(`/eleve/${questionnaireId}`)}>
+          <Button onClick={() => router.push('/eleve')}>
             Voir mon espace
           </Button>
         </div>
       </div>
     )
   }
+
+  if (foundId) return null
 
   return (
     <div className="py-16 text-center">
