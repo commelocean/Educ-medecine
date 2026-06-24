@@ -103,11 +103,8 @@ function Traitement() {
           consulter votre espace : les résultats apparaîtront dès qu&apos;ils seront prêts.
         </p>
         <div className="mt-6 flex justify-center gap-3">
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Réessayer
-          </Button>
-          <Button onClick={() => router.push('/eleve')}>
-            Voir mon espace
+          <Button onClick={() => window.location.reload()}>
+            Continuer à attendre
           </Button>
         </div>
       </div>
